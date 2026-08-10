@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>채점 엔진 테스트 — 김치옥 MOT V2</title>
+<style>
+  body{font-family:-apple-system,"Malgun Gothic",sans-serif; margin:0; padding:20px; background:#f5f6f8; color:#17191f; font-size:14px;}
+  h1{font-size:19px; margin:0 0 6px;} .sub{color:#667085; font-size:13px; margin:0 0 18px;}
+  .sum{padding:14px 16px; border-radius:10px; font-weight:800; margin-bottom:16px; font-size:15px;}
+  .sum.pass{background:#eefaf2; color:#138a3d; border:1px solid #138a3d;}
+  .sum.fail{background:#fff0f0; color:#d32222; border:1px solid #d32222;}
+  h2{font-size:15px; margin:22px 0 8px; padding-left:10px; border-left:4px solid #F5B800;}
+  table{border-collapse:collapse; width:100%; background:#fff; border:1px solid #e6e8ed; border-radius:8px; overflow:hidden;}
+  th,td{padding:9px 11px; text-align:left; border-bottom:1px solid #eef0f3; font-size:13px; vertical-align:top;}
+  th{background:#fafbfc; font-size:12px; color:#667085;}
+  tr:last-child td{border-bottom:none;}
+  .ok{color:#138a3d; font-weight:800;} .ng{color:#d32222; font-weight:800;}
+  td.exp,td.got{font-family:ui-monospace,Consolas,monospace; font-size:12.5px;}
+  tr.bad{background:#fff7f7;}
+</style>
+</head>
+<body>
+<h1>채점 엔진 테스트</h1>
+<p class="sub">scoring.js 를 직접 호출해 결과를 검증합니다. 무르익다·익스프레스 두 버전을 각각 확인합니다.</p>
+<div class="sum" id="sum">실행 중…</div>
+<div id="out"></div>
+
+<script src="../js/config.js"></script>
+<script src="../js/checklist-seed.js"></script>
+<script src="../js/scoring.js"></script>
+<script>
+var S = MOT.scoring, CFG = MOT.config, SEED = MOT.seed;
+var groups = [];          // {title, rows:[]}
+var cur = null;
+
+function group(title){ cur = { title:title, rows:[] }; groups.push(cur); }
+function check(name, expected, actual){
+  var exp = JSON.stringify(expected), got = JSON.stringify(actual);
+  cur.rows.push({ name:name, pass: exp === got, exp:exp, got:got });
+}
+
+/* ---------- 공통 도우미 ---------- */
+function answersAll(CL, value){                   // 일반 문항 전체를 같은 값으로
+  var a = {};
+  CL.items.forEach(function(it){ if (!S.isSituational(it)) a[it.no] = { value:value }; });
+  return a;
+}
+function situAll(CL, value){                      // 상황 문항 전체 발생 + 판정
+  var a = {};
+  CL.items.forEach(function(it){ if (S.isSituational(it)) a[it.no] = { occurred:true, value:value }; });
+  return a;
+}
+function merge(){
+  var out = {};
+  for (var i=0;i<arguments.length;i++) for (var k in arguments[i]) out[k] = arguments[i][k];
+  return out;
+}
+function naCount(CL, n){                          // 앞에서 n개를 해당없음으로
+  var a = answersAll(CL, "O"), c = 0;
+  CL.items.forEach(function(it){
+    if (!S.isSituational(it) && c < n){ a[it.no] = { value:"N" }; c++; }
+  });
+  return a;
+}
+
+/* ---------- 시드 구조 ---------- */
+group("시드 구조");
+check("버전 2개", ["무르익다","익스프레스"], SEED.versionKeys);
+check("무르익다 문항 30개", 30, SEED.versions["무르익다"].items.length);
+check("익스프레스 문항 30개", 30, SEED.versions["익스프레스"].items.length);
+check("10계명 10개", 10, SEED.rules.length);
+check("10계명 번호 두 자리", ["01","02","03","04","05","06","07","08","09","10"],
+      SEED.rules.map(function(r){ return r.no; }));
+check("두 버전의 문항이 실제로 다름", true,
+      JSON.stringify(SEED.versions["무르익다"].items) !== JSON.stringify(SEED.versions["익스프레스"].items));
+
+/* ---------- 버전별 채점 ---------- */
+SEED.versionKeys.forEach(function(key){
+  var CL = { items: SEED.versions[key].items, rules: SEED.rules, stages: SEED.versions[key].stages };
+  function run(answers, ruleState){ return S.compute(CL, answers, ruleState || {}, CFG); }
+
+  group(key);
+
+  var normals = CL.items.filter(function(i){ return !S.isSituational(i); });
+  var situs   = CL.items.filter(S.isSituational);
+  check("일반 문항 이행점수 합계 = 100", 100, normals.reduce(function(s,i){ return s+i.scoreO; }, 0));
+  check("일반 21문항 · 상황 9문항", [21, 9], [normals.length, situs.length]);
+  check("상황 문항은 모두 −2점", true, situs.every(function(i){ return i.scoreX === -2; }));
+  check("매장공통 1문항 (11번 수저·젓가락)", ["11"], CL.items.filter(function(i){ return i.who === "매장공통"; }).map(function(i){ return i.no; }));
+  check("시드에 기록된 만점도 100", 100, SEED.versions[key].normalMax);
+
+  var rAllOk = run(answersAll(CL, "O"));
+  check("전부 이행 → 100점 · S", [100, "S"], [rAllOk.score, rAllOk.grade]);
+  check("전부 이행 → 점검율 100%", 100, Math.round(rAllOk.inspectRate));
+  check("전부 미흡 → 50점 · D", [50, "D"], (function(){ var r = run(answersAll(CL,"T")); return [r.score, r.grade]; })());
+  check("전부 불이행 → 0점 · F", [0, "F"], (function(){ var r = run(answersAll(CL,"X")); return [r.score, r.grade]; })());
+
+  /* 해당없음 환산 — 1번(6점) 제외 */
+  var na1 = answersAll(CL, "O"); na1["1"] = { value:"N" };
+  var rNa = run(na1);
+  check("1번(6점) 해당없음 → 만점 94 · 100점", [94, 100], [rNa.normalMax, rNa.score]);
+  check("해당없음 1건 → 점검율 20/21", 95.2, Math.round(rNa.inspectRate*10)/10);
+
+  /* 상황발생시 */
+  check("상황 미발생 → 감점 0 · 미발생 9건", [0, 9],
+        (function(){ var r = run(answersAll(CL,"O")); return [r.situPenalty, r.situNotOccurred]; })());
+  check("상황 전부 발생·이행 → 감점 0 · 100점", [0, 100],
+        (function(){ var r = run(merge(answersAll(CL,"O"), situAll(CL,"O"))); return [r.situPenalty, r.score]; })());
+  check("상황 전부 불이행 → 감점 18 · 82점", [18, 82],
+        (function(){ var r = run(merge(answersAll(CL,"O"), situAll(CL,"X"))); return [r.situPenalty, r.score]; })());
+
+  var one = merge(answersAll(CL,"O"), {});
+  one["4"] = { occurred:true, value:"X" };
+  check("4번(웨이팅 안내)만 불이행 → 감점 2 · 98점", [2, 98],
+        (function(){ var r = run(one); return [r.situPenalty, r.score]; })());
+
+  /* 10계명 */
+  check("10계명 1건 → −5점 · 95점", [5, 95],
+        (function(){ var r = run(answersAll(CL,"O"), {"01":{occurred:true}}); return [r.rulePenalty, r.score]; })());
+  check("10계명 3건 → −15점 · 85점", [15, 85],
+        (function(){ var r = run(answersAll(CL,"O"), {"01":{occurred:true},"07":{occurred:true},"10":{occurred:true}});
+                     return [r.rulePenalty, r.score]; })());
+
+  /* 하한 0점 */
+  check("전부 불이행 + 상황 + 10계명 → 0점 미만 없음", 0,
+        run(merge(answersAll(CL,"X"), situAll(CL,"X")), {"01":{occurred:true},"02":{occurred:true}}).score);
+
+  /* 점검율 · 등급 상한 (일반 21문항 기준) */
+  check("해당없음 5건 → 점검율 76.2% · 상한 A", [76.2, "A", "S"],
+        (function(){ var r = run(naCount(CL,5)); return [Math.round(r.inspectRate*10)/10, r.grade, r.gradeBeforeCap]; })());
+  check("해당없음 4건 → 점검율 81% · 상한 없음", [81, "S", null],
+        (function(){ var r = run(naCount(CL,4)); return [Math.round(r.inspectRate*10)/10, r.grade, r.gradeCap]; })());
+  check("해당없음 9건 → 상한 B", ["B","B"],
+        (function(){ var r = run(naCount(CL,9)); return [r.grade, r.gradeCap]; })());
+  check("해당없음 12건 → 상한 C + 재점검 대상", ["C", true],
+        (function(){ var r = run(naCount(CL,12)); return [r.grade, r.needsRecheck]; })());
+
+  /* 개인 · 매장공통 */
+  check("매장공통 만점 4점 · 개인 만점 96점", [4, 96], [rAllOk.commonMax, rAllOk.personalMax]);
+
+  /* 게이트 */
+  check("전부 응답 → 통과", true, S.validate(CL, answersAll(CL,"O")).ok);
+  check("상황 '발생함' 판정 안 하면 막힘", false,
+        S.validate(CL, merge(answersAll(CL,"O"), {"4":{occurred:true}})).ok);
+
+  /* 전송용 행 */
+  var rows = S.itemRows(CL, merge(answersAll(CL,"O"), situAll(CL,"X")));
+  check("전송 행 30개", 30, rows.length);
+  check("4번 행(상황 불이행) 감점 2", 2, rows.find(function(x){ return x.no==="4"; }).penalty);
+  check("상황 미발생 행 라벨 = 상황없음", "상황없음",
+        S.itemRows(CL, answersAll(CL,"O")).find(function(x){ return x.no==="4"; }).label);
+});
+
+/* ---------- 버전 간 차이 확인 ---------- */
+group("버전 간 차이");
+var MUR = SEED.versions["무르익다"].items, EXP = SEED.versions["익스프레스"].items;
+function textOf(items, no){ var i = items.find(function(x){ return x.no === no; }); return i ? i.text : ""; }
+check("17번 문항이 서로 다름", true, textOf(MUR,"17") !== textOf(EXP,"17"));
+check("무르익다 17번은 고기류 반찬 세팅", true, textOf(MUR,"17").indexOf("익은지+파김치") >= 0);
+check("익스프레스 17번은 찜·찌개 타이머", true, textOf(EXP,"17").indexOf("타이머") >= 0);
+check("무르익다에만 주차·영수증 확인 문항", [true, false],
+      [MUR.some(function(i){ return i.text.indexOf("주차") >= 0; }),
+       EXP.some(function(i){ return i.text.indexOf("주차") >= 0; })]);
+check("두 버전 모두 단계 8개", [8, 8],
+      [SEED.versions["무르익다"].stages.length, SEED.versions["익스프레스"].stages.length]);
+
+/* ---------- 결과 출력 ---------- */
+var all = groups.reduce(function(a,g){ return a.concat(g.rows); }, []);
+var pass = all.filter(function(r){ return r.pass; }).length;
+var sum = document.getElementById("sum");
+sum.className = "sum " + (pass === all.length ? "pass" : "fail");
+sum.textContent = pass === all.length
+  ? "✅ 전체 통과 — " + all.length + "개 테스트"
+  : "❌ 실패 " + (all.length - pass) + "건 / 전체 " + all.length + "개";
+
+document.getElementById("out").innerHTML = groups.map(function(g){
+  return '<h2>' + g.title + '</h2>'
+    + '<table><thead><tr><th style="width:38%">테스트</th><th style="width:10%">결과</th><th>기대값</th><th>실제값</th></tr></thead><tbody>'
+    + g.rows.map(function(r){
+        return '<tr class="'+(r.pass?"":"bad")+'"><td>'+r.name+'</td>'
+          + '<td class="'+(r.pass?"ok":"ng")+'">'+(r.pass?"통과":"실패")+'</td>'
+          + '<td class="exp">'+r.exp+'</td><td class="got">'+r.got+'</td></tr>';
+      }).join("")
+    + '</tbody></table>';
+}).join("");
+</script>
+</body>
+</html>
