@@ -905,7 +905,14 @@ function testUrl(){
   if (!API.hasUrl()){ toast("먼저 URL을 입력하고 저장해 주세요"); return; }
   toast("확인 중…");
   API.fetchChecklist(true).then(function(d){
-    if (d && d.result === "success") toast("연결 성공 — 문항 "+d.items.length+"개를 확인했어요");
+    if (d && d.result === "success" && d.versions){
+      /* 김치옥은 버전이 두 개라 versions 안을 봐야 합니다 */
+      var counts = (d.versionKeys || CFG.VERSIONS).map(function(k){
+        var v = d.versions[k];
+        return k + " " + (v && v.items ? v.items.length : 0) + "문항";
+      }).join(" · ");
+      toast("연결 성공 — " + counts + (d.valid ? "" : " (⚠️ 확인 필요 " + (d.issues||[]).length + "건)"));
+    }
     else toast("응답은 왔지만 문항을 읽지 못했어요: "+(d && d.message || ""));
   }).catch(function(err){ toast("연결 실패 — "+err.message); });
 }

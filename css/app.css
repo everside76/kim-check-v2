@@ -145,7 +145,7 @@ input[type=number].no-spin::-webkit-outer-spin-button,input[type=number].no-spin
 .notice .btn{margin-top:10px; padding:10px; font-size:13.5px;}
 .edit-banner{margin:0 0 14px; padding:12px 14px; border-radius:10px; font-size:13px; line-height:1.55;
   border:1px solid var(--brand); background:var(--brand-soft); color:var(--brand-ink); font-weight:700;}
-@media (prefers-color-scheme: dark){ .edit-banner{color:#ffb3ad;} }
+@media (prefers-color-scheme: dark){ .edit-banner{color:var(--brand-ink);} }
 
 /* ---------- 진행바 · 단계 이동 ---------- */
 .check-sticky{position:sticky; top:var(--appbar-h, 52px); z-index:30; background:rgba(245,246,248,.94);
@@ -179,7 +179,7 @@ input[type=number].no-spin::-webkit-outer-spin-button,input[type=number].no-spin
 
 /* 상황발생시 문항 */
 .item.situ{background:var(--situ-bg); border-left:4px solid var(--situ-line);}
-.item.situ .item-no{background:linear-gradient(180deg,#e0a044,var(--situ));}
+.item.situ .item-no{background:linear-gradient(180deg,#8b5cf6,var(--situ));}
 .item.situ.occurred{background:var(--card);}
 .occur-row{display:flex; gap:8px; margin-bottom:10px;}
 .occur{flex:1; padding:11px 6px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--sub);
