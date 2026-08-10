@@ -7,7 +7,7 @@ MOT.config = {
   /* Apps Script 웹앱 배포 URL (.../exec)
      결과 스프레드시트 "MOT_김치옥_점검결과_V2" 에 붙인 스크립트의 배포 주소.
      배포 후 아래 값을 채워 넣으세요. 앱 설정 화면에서도 변경할 수 있습니다. */
-  SCRIPT_URL: "",
+  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbyoHWsufcHecj4koFPS5fyzQr_RabMzLD0rt_K5YsCGz-KBM886zeH4ws2Hk2YSs3q9sw/exec",
 
   /* 참고용 시트 주소 (앱 설정 화면 안내에 사용) */
   CHECKLIST_SHEET_URL: "https://docs.google.com/spreadsheets/d/1HApNgMVR2rYjf2kcgn3H76qP9mj-m-4XMlE6y8_Yf6I/edit",
@@ -18,7 +18,7 @@ MOT.config = {
      화면에 보이는 순서이자, 결과 시트의 '브랜드' 컬럼에 "김치옥 무르익다" 형태로 기록됩니다. */
   VERSIONS: ["무르익다", "익스프레스"],
 
-  APP_VERSION: "2.0.1",
+  APP_VERSION: "2.0.2",
 
   /* 등급 컷 (점수 이상이면 해당 등급) */
   GRADE_CUTS: [
@@ -57,6 +57,9 @@ MOT.LS = {
 
 /* 변경 이력 (최신이 위) */
 MOT.CHANGELOG = [
+  { v: "2.0.2", date: "2026-08-10", items: [
+    "구글 시트 연결 완료 — 이제 무르익다·익스프레스 문항을 시트에서 바로 불러옵니다"
+  ]},
   { v: "2.0.1", date: "2026-08-10", items: [
     "설정의 '연결 확인'이 정상 연결인데도 실패로 표시되던 문제를 고쳤습니다 — 이제 두 버전의 문항 수를 함께 보여줍니다",
     "다크모드에서 수정 안내 배너 글씨색과 상황발생시 문항 번호 배지 색을 김치옥 색으로 맞췄습니다"
